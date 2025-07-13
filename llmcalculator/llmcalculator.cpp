@@ -12,7 +12,6 @@ using json = nlohmann::json;
 
 using namespace std;
 
-// Quant sizes & values from your gguf_quants map
 const map<string, double> gguf_quants{
     {"IQ1_S", 1.56},
     {"IQ2_XXS", 2.06},
@@ -48,8 +47,7 @@ struct ModelConfig {
     float parameters;
 
     double get_dtype_divider() const {
-        // Extract digits from torch_dtype's string and divide by 8
-        // e.g. "torch.float16" -> 16/8 = 2
+        // Extract digits from torch_dtype's string and div/8
         string digits_only;
         for (char c : torch_dtype) {
             if (isdigit(c)) {
@@ -67,7 +65,7 @@ ModelConfig parseConfig(const json& j, float p) {
     ModelConfig mc;
 
     if (j.contains("text_config")) {
-        // If text_config key exists, use that instead
+		// this shouldnt be here but just in case
         return parseConfig(j["text_config"], p);
     }
 
@@ -93,15 +91,7 @@ ModelConfig parseConfig(const json& j, float p) {
 }
 
 /*
-inputBuffer calculation copied from JS:
-  const inp_tokens = bsz
-  const inp_embd = model_config["hidden_size"] * bsz
-  const inp_pos = bsz
-  const inp_KQ_mask = context * bsz
-  const inp_K_shift = context
-  const inp_sum = bsz
-
-  return inp_tokens + inp_embd + inp_pos + inp_KQ_mask + inp_K_shift + inp_sum
+inputBuffer calculation
 */
 double inputBuffer(int context, const ModelConfig& mc, int bsz) {
     int inp_tokens = bsz;
@@ -115,8 +105,7 @@ double inputBuffer(int context, const ModelConfig& mc, int bsz) {
 }
 
 /*
-computeBuffer calculation ported from JS:
-  (context / 1024 * 2 + 0.75) * model_config["num_attention_heads"] * 1024 * 1024
+computeBuffer calculation
 */
 double computeBuffer(int context, const ModelConfig& mc, int bsz) {
     if (bsz != 512) {
@@ -128,12 +117,7 @@ double computeBuffer(int context, const ModelConfig& mc, int bsz) {
 
 
 /*
-kvCache calculation from JS:
-  n_gqa = num_attention_heads / num_key_value_heads
-  n_embd_gqa = hidden_size / n_gqa
-  n_elements = n_embd_gqa * (num_hidden_layers * context)
-  size = 2 * n_elements
-  return size * (cache_bit / 8)
+kvCache calculation
 */
 double kvCache(int context, const ModelConfig& mc, int cache_bit) {
     double n_gqa = (double)mc.num_attention_heads / mc.num_key_value_heads;
@@ -144,16 +128,14 @@ double kvCache(int context, const ModelConfig& mc, int cache_bit) {
 }
 
 /*
-contextSize from JS:
-inputBuffer(context, mc, bsz) + kvCache(context, mc, cache_bit) + computeBuffer(context, mc, bsz)
+contextSize calculation
 */
 double contextSize(int context, const ModelConfig& mc, int bsz, int cache_bit) {
     return inputBuffer(context, mc, bsz) + kvCache(context, mc, cache_bit) + computeBuffer(context, mc, bsz);
 }
 
 /*
-modelSize calculation from JS:
-model_config["parameters"] * bpw / 8
+modelSize calculation
 */
 double modelSize(const ModelConfig& mc, double bpw) {
     return (mc.parameters * bpw) / 8.0;
@@ -170,7 +152,7 @@ int main(int argc, char* argv[]) {
     string configPath = argv[1];
     float p = atof(argv[2]) * 1000000000;
 
-    // Read config file
+    // read config file
     ifstream file(configPath);
     if (!file.is_open()) {
         cerr << "Failed to open config file: " << configPath << endl;
@@ -195,12 +177,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Determine dtype divider and adjust parameters accordingly if parameters is 0 or not matching
-    // (in JS code, they calculate parameters from file metadata / dtype divider. We expect parameters to be given directly)
-    // Just to keep compatibility, we do nothing here, assuming parameters are correct.
-
-    // Ask the user for inputs
-
     cout << "Enter quant format (gguf or exl2): ";
     string quantFormat{};
     cin >> quantFormat;
@@ -213,7 +189,7 @@ int main(int argc, char* argv[]) {
 
     cout << "Enter context size (default 8192): ";
     string input;
-    cin.ignore(); // flush newline from input buffer
+    cin.ignore();
     getline(cin, input);
     if (!input.empty()) {
         try {
@@ -236,8 +212,7 @@ int main(int argc, char* argv[]) {
         if (quantSize.empty()) quantSize = "Q4_K_S";
         else quantSize.erase(remove_if(quantSize.begin(), quantSize.end(), ::isspace), quantSize.end()); // trim spaces
 
-        // Make all uppercase for safety & matching keys - but keep format intact
-        // Matching is case sensitive in map, so we do exact match
+        // matching is case sensitive in map!!
         if (gguf_quants.find(quantSize) == gguf_quants.end()) {
             cout << "Invalid quantization size entered, defaulting to Q4_K_S" << endl;
             quantSize = "Q4_K_S";
