@@ -40,12 +40,12 @@ const map<string, double> gguf_quants{
 };
 
 struct ModelConfig {
-    int hidden_size;
-    int num_attention_heads;
-    int num_key_value_heads;
-    int num_hidden_layers;
-    std::string torch_dtype;
-    double parameters;
+    int hidden_size{};
+    int num_attention_heads{};
+    int num_key_value_heads{};
+    int num_hidden_layers{};
+    std::string torch_dtype{};
+    double parameters{};
 
     double get_dtype_divider() const {
         string digits_only;
@@ -85,7 +85,7 @@ ModelConfig parseConfig(const json& j, double p) {
 }
 
 
-double inputBuffer(int context, const ModelConfig& mc, int bsz) {
+double inBuffer(int context, const ModelConfig& mc, int bsz) {
     int inp_tokens = bsz;
     int inp_embd = mc.hidden_size * bsz;
     int inp_pos = bsz;
@@ -116,8 +116,8 @@ double kvCache(int context, const ModelConfig& mc, int cache_bit) {
 }
 
 
-double contextSize(int context, const ModelConfig& mc, int bsz, int cache_bit) {
-    return inputBuffer(context, mc, bsz) + kvCache(context, mc, cache_bit) + computeBuffer(context, mc, bsz);
+double ctxSize(int context, const ModelConfig& mc, int bsz, int cache_bit) {
+    return inBuffer(context, mc, bsz) + kvCache(context, mc, cache_bit) + computeBuffer(context, mc, bsz);
 }
 
 
@@ -321,7 +321,7 @@ int main(int argc, char* argv[]) {
     // showtime
     try {
         double model_size = modelSize(mc, bpw);
-        double context_size = contextSize(context, mc, bsz, cache_bit);
+        double context_size = ctxSize(context, mc, bsz, cache_bit);
         double total_size = model_size + context_size;
 
         if (argc != 7) {
