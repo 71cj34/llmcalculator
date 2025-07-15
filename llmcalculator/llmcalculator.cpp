@@ -6,6 +6,7 @@
 #include <cmath>
 #include <algorithm>
 #include <stdexcept>
+#include <iomanip>
 
 #include "nlohmann/json.hpp"
 using json = nlohmann::json;
@@ -47,7 +48,6 @@ struct ModelConfig {
     double parameters;
 
     double get_dtype_divider() const {
-        // Extract digits from torch_dtype's string and div/8
         string digits_only;
         for (char c : torch_dtype) {
             if (isdigit(c)) {
@@ -84,9 +84,7 @@ ModelConfig parseConfig(const json& j, double p) {
     return mc;
 }
 
-/*
-inputBuffer calculation
-*/
+
 double inputBuffer(int context, const ModelConfig& mc, int bsz) {
     int inp_tokens = bsz;
     int inp_embd = mc.hidden_size * bsz;
@@ -98,9 +96,7 @@ double inputBuffer(int context, const ModelConfig& mc, int bsz) {
     return inp_tokens + inp_embd + inp_pos + inp_KQ_mask + inp_K_shift + inp_sum;
 }
 
-/*
-computeBuffer calculation
-*/
+
 double computeBuffer(int context, const ModelConfig& mc, int bsz) {
     if (bsz != 512) {
         cerr << "Warning: batch size other than 512 is currently not supported for the compute buffer calculation" << endl;
@@ -110,9 +106,7 @@ double computeBuffer(int context, const ModelConfig& mc, int bsz) {
 }
 
 
-/*
-kvCache calculation
-*/
+
 double kvCache(int context, const ModelConfig& mc, int cache_bit) {
     double n_gqa = (double)mc.num_attention_heads / mc.num_key_value_heads;
     double n_embd_gqa = mc.hidden_size / n_gqa;
@@ -121,16 +115,12 @@ double kvCache(int context, const ModelConfig& mc, int cache_bit) {
     return size * (cache_bit / 8.0);
 }
 
-/*
-contextSize calculation
-*/
+
 double contextSize(int context, const ModelConfig& mc, int bsz, int cache_bit) {
     return inputBuffer(context, mc, bsz) + kvCache(context, mc, cache_bit) + computeBuffer(context, mc, bsz);
 }
 
-/*
-modelSize calculation
-*/
+
 double modelSize(const ModelConfig& mc, double bpw) {
     return (mc.parameters * bpw) / 8.0;
 }
@@ -152,7 +142,7 @@ int main(int argc, char* argv[]) {
 	argv[6] = quant size (if gguf) (exclusive)
     */
 
-    // def all variables since if/else is a different scope QwQ
+    // these get actually set later
     string configPath{};
     double p{};
     string quantFormat{};
@@ -162,7 +152,7 @@ int main(int argc, char* argv[]) {
     double bpw = 0;
     string quantSize{};
 
-    // cli mode onramp
+    // gui mode onramp
     if (argc != 7) {
         cout << "If you were looking for the CLI mode, please use the format below." << endl;
         cout << "Usage: " << argv[0] << " <path_to_config_json>" << " <parameters (float, billions)>" << " <quant_format (gguf or exl2)>" << " <context_size (int)>"
@@ -334,10 +324,22 @@ int main(int argc, char* argv[]) {
         double context_size = contextSize(context, mc, bsz, cache_bit);
         double total_size = model_size + context_size;
 
-        cout << "\nResults (in GB):" << endl;
-        cout << "  Model Size:   " << model_size / (1024 * 1024 * 1024) << " GB" << endl;
-        cout << "  Context Size: " << context_size / (1024 * 1024 * 1024) << " GB" << endl;
-        cout << "  Total Size:   " << total_size / (1024 * 1024 * 1024) << " GB" << endl;
+        if (argc != 7) {
+            cout << fixed << setprecision(3);
+            cout << "\nResults (in GB):" << endl;
+            cout << "  Model Size:   " << model_size / (1024 * 1024 * 1024) << " GB" << endl;
+            cout << "  Context Size: " << context_size / (1024 * 1024 * 1024) << " GB" << endl;
+            cout << "  Total Size:   " << total_size / (1024 * 1024 * 1024) << " GB" << endl;
+        }
+        else {
+            cout << fixed << setprecision(8);
+            std::cout << "{\n";
+            std::cout << "  \"model_size\": " << model_size / (1024 * 1024 * 1024) << ",\n";
+            std::cout << "  \"context_size\": " << context_size / (1024 * 1024 * 1024) << ",\n";
+            std::cout << "  \"total_size\": " << total_size / (1024 * 1024 * 1024) << "\n";
+            std::cout << "}" << std::endl;
+
+        }
     }
     catch (exception& e) {
         cerr << "Error during calculation: " << e.what() << endl;
