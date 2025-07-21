@@ -136,10 +136,10 @@ int main(int argc, char* argv[]) {
 	argv[2] = parameters in billions
 	argv[3] = quant format (gguf or exl2)
 	argv[4] = ctx
-	argv[5] = kv cache bit size (if exl2)
-	argv[5] = batch size (if gguf) (exclusive)
-	argv[6] = bpw (if exl2)
-	argv[6] = quant size (if gguf) (exclusive)
+	argv[5] = kv cache bit size
+	argv[6] = batch size (if gguf)
+	argv[6] = bpw (if exl2) (exclusive)
+	argv[7] = quant size (if gguf) (exclusive)
     */
 
     // these get actually set later
@@ -153,11 +153,11 @@ int main(int argc, char* argv[]) {
     string quantSize{};
 
     // gui mode onramp
-    if (argc != 7) {
+    if (argc != 8 && argc != 7) {
         cout << "If you were looking for the CLI mode, please use the format below." << endl;
         cout << "Usage: " << argv[0] << " <path_to_config_json>" << " <parameters (float, billions)>" << " <quant_format (gguf or exl2)>" << " <context_size (int)>"
-            << " [<kv_cache_bit_size (if exl2, 16/8/4)>" << " <batch_size (if gguf, int)>]" << " [<bpw (if exl2, float)>" << " <quant_size (if gguf, string)>]" <<
-            "\nwhere you only include one from each square bracket pair depending on your desired quant format." << '\n' << endl;
+            << " <kv_cache_bit_size (16/8/4)>" << " <batch_size (if gguf, int)>" << " [<bpw (if exl2, float)>" << " <quant_size (if gguf, string)>]" <<
+            "\nwhere you only include one from the square bracket pair depending on your desired quant format." << '\n' << endl;
         
         cout << "Enter your model config path (local):\n";
         cin >> configPath;
@@ -198,10 +198,33 @@ int main(int argc, char* argv[]) {
             if (quantSize.empty()) quantSize = "Q4_K_S";
             else quantSize.erase(remove_if(quantSize.begin(), quantSize.end(), ::isspace), quantSize.end()); // trim spaces
 
-            // matching is case sensitive in map!!
+            // map case sensitive
             if (gguf_quants.find(quantSize) == gguf_quants.end()) {
                 cout << "Invalid quantization size entered, defaulting to Q4_K_S" << endl;
                 quantSize = "Q4_K_S";
+            }
+
+            cout << "Enter KV Cache bit size (16, 8, or 4) (default 16): ";
+            string kvStr;
+            getline(cin, kvStr);
+            if (!kvStr.empty()) {
+                try {
+                    int v = stoi(kvStr);
+                    if (v == 16 || v == 8 || v == 4) {
+                        cache_bit = v;
+                    }
+                    else {
+                        cout << "Invalid KV cache bit size, defaulting to 16." << endl;
+                        cache_bit = 16;
+                    }
+                }
+                catch (...) {
+                    cout << "Invalid KV cache bit size, defaulting to 16." << endl;
+                    cache_bit = 16;
+                }
+            }
+            else {
+                cache_bit = 16;
             }
 
             cout << "Enter batch size (default 512): ";
@@ -270,6 +293,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
+    // cli mode
     else {
         configPath = argv[1];
         
@@ -280,8 +304,9 @@ int main(int argc, char* argv[]) {
         context = atoi(argv[4]);
 
         if (quantFormat == "gguf") {
-            bsz = atoi(argv[5]);
-            quantSize = argv[6];
+			cache_bit = atoi(argv[5]);
+            bsz = atoi(argv[6]);
+            quantSize = argv[7];
             bpw = gguf_quants.at(quantSize);
         } else if (quantFormat == "exl2") {
             cache_bit = atoi(argv[5]);

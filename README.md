@@ -25,7 +25,7 @@ The **cli** is designed for workflows and integrated systems where the executabl
 other programs. The syntax is as follows:
 
 ```
-llmcalculator.exe <path_to_config.json> <parameters (float, billions)> <quant_format (str, gguf OR exl2)> <ctx_size (int)> [<kv_cache_bit_size (IF exl2, 16/8/4)> <batch_size (IF gguf, int)>] [<bpw (IF exl2, float)> <quant_size (IF gguf, string)>]
+llmcalculator.exe <path_to_config.json> <parameters (float, billions)> <quant_format (str, gguf OR exl2)> <ctx_size (int)> <kv_cache_bit_size (16/8/4)> <batch_size (IF gguf, int)> [<bpw (IF exl2, float)> <quant_size (IF gguf, string)>]
 ```
 
 where groups in **curly braces, []**, are exclusive: you include one from each group based on your desired quantization format.
@@ -43,7 +43,7 @@ where groups in **curly braces, []**, are exclusive: you include one from each g
   - Case insensitive.
 - `ctx_size`
   - Context size. Int.
-- `kv_cache_bit_size` (Conditional: `exl2` only)
+- `kv_cache_bit_size`
   - Bit size of the KV cache used. Integer.
   - Values supported: `16`, `8`, `4` (note this parameter is technically bits/fp)
   - Use 16 if you're not sure what to use.
@@ -57,6 +57,8 @@ where groups in **curly braces, []**, are exclusive: you include one from each g
   - Type of quant used. String.
   - Options : `IQ1_S`, `IQ2_XXS`, `IQ2_XS`, `IQ2_S`, `IQ2_M`, `IQ3_XXS`, `IQ3_XS`, `Q2_K`, `Q3_K_S`, `IQ3_S`, `IQ3_M`, `Q3_K_M`, `Q3_K_L`, `IQ4_XS`, `IQ4_NL`, `Q4_0`, `Q4_K_S`, `Q4_K_M`, `Q5_0`, `Q5_K_S`, `Q5_K_M`, `Q6_K`, `Q8_0`
   - Case insensitive.
+
+Note that while the interactive mode will correct you and use defaults, the cli will not grant you any such mercy. If you enter something invalid, it will keep going and either crash or output incorrect data. So... don't.
 
 The cli will output json-formatted data in format
 ```json
